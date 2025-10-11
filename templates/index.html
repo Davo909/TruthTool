@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthTool — Proof + Countermodel Studio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <!-- Top Navigation -->
+        <header class="top-bar">
+            <div class="logo">
+                <h1>TruthTool</h1>
+                <span class="tagline">Proof + Countermodel Studio</span>
+            </div>
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="workspace">Workspace</button>
+                <button class="nav-tab" data-tab="results">Results</button>
+                <button class="nav-tab" data-tab="examples">Examples</button>
+            </nav>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Workspace Tab -->
+            <div class="tab-content active" id="workspace">
+                <div class="workspace-layout">
+                    <!-- Left Panel: Argument Editor -->
+                    <div class="editor-panel">
+                        <div class="panel-header">
+                            <h2>Argument Editor</h2>
+                            <div class="logic-selector">
+                                <label>Logic:</label>
+                                <select id="logic-type">
+                                    <option value="PL">Propositional</option>
+                                    <option value="FOL">First-Order</option>
+                                    <option value="MODAL">Modal</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="argument-editor">
+                            <div class="premises-section">
+                                <label for="premises">Premises (one per line):</label>
+                                <textarea id="premises" placeholder="(P -> Q)&#10;P" rows="6"></textarea>
+                            </div>
+                            
+                            <div class="conclusion-section">
+                                <label for="conclusion">Conclusion:</label>
+                                <input type="text" id="conclusion" placeholder="Q">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Panel: Settings & Controls -->
+                    <div class="settings-panel">
+                        <div class="panel-header">
+                            <h2>Settings</h2>
+                        </div>
+                        
+                        <div class="settings-content">
+                            <!-- Modal Settings -->
+                            <div class="setting-group" id="modal-settings" style="display: none;">
+                                <label>Modal Frame:</label>
+                                <select id="modal-frame">
+                                    <option value="K">K</option>
+                                    <option value="T">T</option>
+                                    <option value="S4">S4</option>
+                                </select>
+                            </div>
+                            
+                            <!-- FOL Settings -->
+                            <div class="setting-group" id="fol-settings" style="display: none;">
+                                <label>Domain Size:</label>
+                                <input type="number" id="fol-domain-size" value="3" min="1" max="10">
+                                
+                                <label>Term Depth:</label>
+                                <input type="number" id="fol-term-depth" value="2" min="1" max="5">
+                            </div>
+                            
+                            <div class="setting-group">
+                                <label>Timeout (seconds):</label>
+                                <input type="number" id="timeout" value="5" min="1" max="30">
+                            </div>
+                            
+                            <div class="run-controls">
+                                <button id="run-button" class="run-button">
+                                    <span class="button-text">Prove or Find Countermodel</span>
+                                    <span class="button-icon">▶</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Tab -->
+            <div class="tab-content" id="results">
+                <div class="results-container">
+                    <div class="result-summary" id="result-summary">
+                        <div class="status-card">
+                            <div class="status-icon">⏳</div>
+                            <div class="status-text">Ready to run</div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-tabs" id="result-tabs" style="display: none;">
+                        <!-- Result tabs hidden - only relevant visualizations are shown automatically -->
+                    </div>
+                    
+                    <div class="result-content" id="results-container">
+                        <div class="result-panel" id="truth-table-panel" style="display: none;">
+                            <div class="panel-header">
+                                <h3>Truth Table</h3>
+                            </div>
+                            <div class="truth-table-container" id="truth-table-container">
+                                <p>Run an argument to see the truth table</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Proof DAG panel removed -->
+                        
+                        <div class="result-panel" id="kripke-panel" style="display: none;">
+                            <div class="panel-header">
+                                <h3>Kripke Model</h3>
+                            </div>
+                            <div class="kripke-container" id="kripke-container">
+                                <p>Run a modal argument to see the Kripke model</p>
+                            </div>
+                        </div>
+                        
+                        <div class="result-panel" id="structure-panel" style="display: none;">
+                            <div class="panel-header">
+                                <h3>Finite Structure</h3>
+                            </div>
+                            <div class="structure-container" id="structure-container">
+                                <p>Run a FOL argument to see the finite structure</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Examples Tab -->
+            <div class="tab-content" id="examples">
+                <div class="examples-container">
+                    <div class="examples-header">
+                        <h2>Curated Examples</h2>
+                        <p>Click any example to load it into the workspace</p>
+                    </div>
+                    
+                    <div class="examples-grid" id="examples-grid">
+                        <div class="loading">Loading examples...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

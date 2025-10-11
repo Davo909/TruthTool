@@ -1,0 +1,1 @@
+# LogicFoundry Core Module
