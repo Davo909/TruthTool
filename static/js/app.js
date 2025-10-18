@@ -1,560 +1,471 @@
 // TruthTool Frontend Application
 class TruthToolApp {
     constructor() {
-        this.currentTab = 'workspace';
-        this.currentResultTab = 'truth-table';
-        this.isRunning = false;
-        this.currentResult = null;
-        
-        this.init();
+      this.currentTab = 'workspace';
+      this.isRunning = false;
+      this.currentResult = null;
+      this.init();
     }
-    
+  
     init() {
-        this.setupEventListeners();
-        this.loadExamples();
-        this.updateLogicSettings();
+      this.setupEventListeners();
+      this.loadExamples();
+      this.updateLogicSettings();
     }
-    
+  
     setupEventListeners() {
-        // Tab navigation
-        document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
-            });
-        });
-        
-        // Result tab navigation disabled - tabs are automatically managed
-        
-        // Logic type change
-        document.getElementById('logic-type').addEventListener('change', () => {
-            this.updateLogicSettings();
-        });
-        
-        // Run button
-        document.getElementById('run-button').addEventListener('click', () => {
-            this.runSolver();
-        });
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
-                e.preventDefault();
-                this.runSolver();
-            }
-        });
+      // Tabs
+      document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+      });
+  
+      // Logic change
+      document.getElementById('logic-type').addEventListener('change', () => this.updateLogicSettings());
+  
+      // Run
+      document.getElementById('run-button').addEventListener('click', () => this.runSolver());
+  
+      // Keyboard: Ctrl+Enter to run
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          this.runSolver();
+        }
+      });
+  
+      // Symbol palette
+      document.querySelectorAll('.symbol-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => this.insertSymbol(e.target.dataset.symbol));
+      });
     }
-    
+  
     switchTab(tabName) {
-        // Update tab buttons
-        document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        
-        // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById(tabName).classList.add('active');
-        
-        this.currentTab = tabName;
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById(tabName).classList.add('active');
+      this.currentTab = tabName;
     }
-    
-    // switchResultTab function removed - result tabs are now automatically managed
-    
+  
+    insertSymbol(symbol) {
+      const premises = document.getElementById('premises');
+      const conclusion = document.getElementById('conclusion');
+      let field = document.activeElement === premises ? premises :
+                  document.activeElement === conclusion ? conclusion : premises;
+      const start = field.selectionStart, end = field.selectionEnd;
+      field.value = field.value.substring(0, start) + symbol + field.value.substring(end);
+      field.setSelectionRange(start + symbol.length, start + symbol.length);
+      field.dispatchEvent(new Event('input', {bubbles:true}));
+    }
+  
     updateLogicSettings() {
-        const logicType = document.getElementById('logic-type').value;
-        
-        // Show/hide relevant settings
-        document.getElementById('modal-settings').style.display = 
-            logicType === 'MODAL' ? 'block' : 'none';
-        document.getElementById('fol-settings').style.display = 
-            logicType === 'FOL' ? 'block' : 'none';
+      const logic = document.getElementById('logic-type').value;
+      document.getElementById('modal-settings').style.display = (logic === 'MODAL') ? 'block' : 'none';
+      document.getElementById('fol-settings').style.display = (logic === 'FOL') ? 'block' : 'none';
     }
-    
+  
     async runSolver() {
-        if (this.isRunning) return;
-        
-        this.isRunning = true;
-        this.updateRunButton(true);
-        
-        try {
-            // Get input data
-            const premises = document.getElementById('premises').value
-                .split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0);
-            
-            const conclusion = document.getElementById('conclusion').value.trim();
-            
-            if (premises.length === 0 || !conclusion) {
-                throw new Error('Please provide at least one premise and a conclusion');
-            }
-            
-            const logic = document.getElementById('logic-type').value;
-            const settings = {
-                modalFrame: document.getElementById('modal-frame').value,
-                folDomainSize: parseInt(document.getElementById('fol-domain-size').value),
-                folTermDepth: parseInt(document.getElementById('fol-term-depth').value),
-                timeout: parseInt(document.getElementById('timeout').value) * 1000
-            };
-            
-            // Show loading state
-            this.showResultSummary('⏳', 'Running solver...', 'status-unknown');
-            
-            // Call solver API
-            const response = await fetch('/api/solve', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    premises,
-                    conclusion,
-                    logic,
-                    settings
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(result.error || 'Solver failed');
-            }
-            
-            // Process result
-            this.currentResult = result.result;
-            this.displayResult(result.result);
-            
-        } catch (error) {
-            console.error('Solver error:', error);
-            this.showResultSummary('❌', `Error: ${error.message}`, 'status-error');
-        } finally {
-            this.isRunning = false;
-            this.updateRunButton(false);
-        }
-    }
-    
-    updateRunButton(running) {
-        const button = document.getElementById('run-button');
-        const text = button.querySelector('.button-text');
-        const icon = button.querySelector('.button-icon');
-        
-        if (running) {
-            button.disabled = true;
-            text.textContent = 'Running...';
-            icon.textContent = '⏳';
-        } else {
-            button.disabled = false;
-            text.textContent = 'Prove or Find Countermodel';
-            icon.textContent = '▶';
-        }
-    }
-    
-    showResultSummary(icon, text, className) {
-        const summary = document.getElementById('result-summary');
-        summary.innerHTML = `
-            <div class="status-card">
-                <div class="status-icon">${icon}</div>
-                <div class="status-text ${className}">${text}</div>
-            </div>
-        `;
-    }
-    
-    displayResult(result) {
-        // Update status
-        const statusMap = {
-            'VALID': { icon: '✅', text: 'Valid', class: 'status-valid' },
-            'INVALID': { icon: '❌', text: 'Invalid', class: 'status-invalid' },
-            'UNKNOWN': { icon: '❓', text: 'Unknown', class: 'status-unknown' },
-            'ERROR': { icon: '⚠️', text: 'Error', class: 'status-error' }
+      if (this.isRunning) return;
+      this.isRunning = true;
+      this.updateRunButton(true);
+  
+      try {
+        const premises = document.getElementById('premises').value
+          .split('\n').map(s => s.trim()).filter(Boolean);
+        const conclusion = document.getElementById('conclusion').value.trim();
+        if (!premises.length || !conclusion) throw new Error('Please provide at least one premise and a conclusion.');
+  
+        const logic = document.getElementById('logic-type').value;
+        const settings = {
+          modalFrame: document.getElementById('modal-frame').value,
+          domainSize: parseInt(document.getElementById('fol-domain').value || '2', 10),
+          termDepth: parseInt(document.getElementById('fol-depth').value || '1', 10),
+          timeout: parseInt(document.getElementById('timeout').value || '8', 10) * 1000
         };
-        
-        const status = statusMap[result.status] || statusMap['ERROR'];
-        this.showResultSummary(status.icon, status.text, status.class);
-        
-        // Hide result tabs - only show relevant visualizations automatically
-        document.getElementById('result-tabs').style.display = 'none';
-        
-        // Switch to results tab
+  
+        this.showResultSummary('⏳', 'Running solver…', 'status-unknown');
+  
+        const resp = await fetch('/api/solve', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ premises, conclusion, logic, settings })
+        });
+  
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw new Error(data.error || 'Solver failed.');
+  
+        this.displayResult(data.result);
+  
+      } catch (err) {
+        console.error(err);
+        this.showResultSummary('❌', `Error: ${err.message}`, 'status-error');
+      } finally {
+        this.isRunning = false;
+        this.updateRunButton(false);
         this.switchTab('results');
-        
-        // Hide all result panels first
-        this.hideAllResultPanels();
-        
-        // Display only relevant artifacts based on available data
-        let hasRelevantData = false;
-        
-        if (result.artifacts) {
-            // Show truth table for propositional logic (both valid and invalid)
-            if (result.artifacts.truth_table) {
-                this.displayTruthTable(result.artifacts.truth_table);
-                this.showResultPanel('truth-table');
-                hasRelevantData = true;
-            }
-            
-            // Proof DAG functionality removed
-            
-            // Show Kripke model for modal logic
-            if (result.artifacts.kripke) {
-                this.displayKripkeModel(result.artifacts.kripke);
-                this.showResultPanel('kripke');
-                hasRelevantData = true;
-            }
-            
-            // Show finite structure for FOL
-            if (result.artifacts.structure) {
-                this.displayFiniteStructure(result.artifacts.structure);
-                this.showResultPanel('structure');
-                hasRelevantData = true;
-            }
-        }
-        
-        // If no relevant data, show a message
-        if (!hasRelevantData) {
-            this.showNoDataMessage();
-        }
+      }
     }
-    
-    displayTruthTable(truthTable) {
-        const container = document.getElementById('truth-table-container');
-        
-        if (!truthTable || truthTable.length === 0) {
-            container.innerHTML = '<p>No truth table data available</p>';
-            return;
-        }
-        
-        const variables = Object.keys(truthTable[0].values);
-        
-        let html = '<div class="truth-table-wrapper">';
-        html += '<table class="truth-table">';
-        html += '<thead><tr>';
-        variables.forEach(varName => {
-            html += `<th>${varName}</th>`;
-        });
-        html += '<th>Result</th>';
-        html += '</tr></thead><tbody>';
-        
-        truthTable.forEach((row, index) => {
-            const rowClass = row.is_counterexample ? 'counterexample' : '';
-            html += `<tr class="${rowClass}" data-row="${index}">`;
-            variables.forEach(varName => {
-                const value = row.values[varName] ? 'T' : 'F';
-                const cellClass = row.is_counterexample ? 'highlight' : '';
-                html += `<td class="${cellClass}">${value}</td>`;
-            });
-            
-            // Add result column
-            const resultClass = row.is_counterexample ? 'invalid-result' : 'valid-result';
-            const resultText = row.is_counterexample ? '❌' : '✅';
-            html += `<td class="${resultClass}">${resultText}</td>`;
-            html += '</tr>';
-        });
-        
-        html += '</tbody></table>';
-        html += '</div>';
-        
-        // Add summary
-        const counterexampleCount = truthTable.filter(row => row.is_counterexample).length;
-        if (counterexampleCount > 0) {
-            html += `<div class="truth-table-summary">
-                <p><strong>Found ${counterexampleCount} counterexample(s)</strong> - highlighted in red</p>
-            </div>`;
-        } else {
-            html += `<div class="truth-table-summary">
-                <p><strong>No counterexamples found</strong> - argument is valid</p>
-            </div>`;
-        }
-        
-        container.innerHTML = html;
+  
+    updateRunButton(running) {
+      const b = document.getElementById('run-button');
+      b.disabled = running;
+      b.querySelector('.button-text').textContent = running ? 'Running…' : 'Prove or Find Countermodel';
+      b.querySelector('.button-icon').textContent = running ? '⏳' : '▶';
     }
-    
-    // displayProofDag function removed
-    
-    displayKripkeModel(kripke) {
-        const container = document.getElementById('kripke-container');
-        
-        if (!kripke) {
-            container.innerHTML = '<p>No Kripke model data available</p>';
-            return;
-        }
-        
-        let html = '<div class="kripke-container">';
-        html += '<div class="kripke-header">';
-        html += '<h4>Kripke Model</h4>';
-        html += '<div class="kripke-info">';
-        html += `<p><strong>Frame:</strong> ${kripke.frame || 'K'}</p>`;
-        html += `<p><strong>Worlds:</strong> ${kripke.worlds ? kripke.worlds.length : 0}</p>`;
-        html += '</div>';
-        html += '</div>';
-        
-        if (kripke.worlds && kripke.worlds.length > 0) {
-            html += '<div class="kripke-graph">';
-            
-            // Display worlds
-            kripke.worlds.forEach((world, index) => {
-                const worldClass = world.is_root ? 'world root' : 'world';
-                html += `<div class="${worldClass}" data-world="${world.id}">`;
-                html += `<div class="world-id">${world.id}</div>`;
-                
-                if (world.valuation && Object.keys(world.valuation).length > 0) {
-                    html += '<div class="world-valuation">';
-                    Object.entries(world.valuation).forEach(([prop, value]) => {
-                        const valueClass = value ? 'true' : 'false';
-                        html += `<span class="proposition ${valueClass}">${prop}</span>`;
-                    });
-                    html += '</div>';
-                }
-                
-                html += '</div>';
-            });
-            
-            // Display accessibility relations
-            if (kripke.edges && kripke.edges.length > 0) {
-                html += '<div class="accessibility-relations">';
-                html += '<h5>Accessibility Relations</h5>';
-                kripke.edges.forEach(edge => {
-                    html += `<div class="accessibility-edge">`;
-                    html += `${edge.from} → ${edge.to}`;
-                    if (edge.properties) {
-                        html += ` (${edge.properties.join(', ')})`;
-                    }
-                    html += '</div>';
-                });
-                html += '</div>';
-            }
-            
-            html += '</div>';
-        } else {
-            html += '<div class="kripke-placeholder">';
-            html += '<p>No worlds in this model</p>';
-            html += '</div>';
-        }
-        
-        html += '</div>';
-        container.innerHTML = html;
+  
+    showResultSummary(icon, text, className) {
+      const summary = document.getElementById('result-summary');
+      summary.innerHTML = `
+        <div class="status-card">
+          <div class="status-icon">${icon}</div>
+          <div class="status-text ${className}">${text}</div>
+        </div>`;
     }
-    
-    displayFiniteStructure(structure) {
-        const container = document.getElementById('structure-container');
-        
-        if (!structure) {
-            container.innerHTML = '<p>No finite structure data available</p>';
-            return;
-        }
-        
-        let html = '<div class="structure-container">';
-        html += '<div class="structure-header">';
-        html += '<h4>Finite Structure</h4>';
-        html += '<div class="structure-info">';
-        html += `<p><strong>Domain Size:</strong> ${structure.domain ? structure.domain.length : 0}</p>`;
-        html += `<p><strong>Predicates:</strong> ${structure.predicates ? Object.keys(structure.predicates).length : 0}</p>`;
-        html += `<p><strong>Functions:</strong> ${structure.functions ? Object.keys(structure.functions).length : 0}</p>`;
-        html += '</div>';
-        html += '</div>';
-        
-        // Display domain
-        if (structure.domain && structure.domain.length > 0) {
-            html += '<div class="structure-section">';
-            html += '<h5>Domain</h5>';
-            html += '<div class="domain-list">';
-            structure.domain.forEach((element, index) => {
-                html += `<span class="domain-element">${element}</span>`;
-            });
-            html += '</div>';
-            html += '</div>';
-        }
-        
-        // Display predicates
-        if (structure.predicates && Object.keys(structure.predicates).length > 0) {
-            html += '<div class="structure-section">';
-            html += '<h5>Predicates</h5>';
-            Object.entries(structure.predicates).forEach(([predName, extensions]) => {
-                html += `<div class="predicate-table">`;
-                html += `<h6>${predName}</h6>`;
-                html += '<table class="predicate-matrix">';
-                
-                // Create header row
-                html += '<thead><tr>';
-                for (let i = 0; i < structure.domain.length; i++) {
-                    html += `<th>${structure.domain[i]}</th>`;
-                }
-                html += '</tr></thead>';
-                
-                // Create data rows
-                html += '<tbody>';
-                for (let i = 0; i < structure.domain.length; i++) {
-                    html += '<tr>';
-                    for (let j = 0; j < structure.domain.length; j++) {
-                        const tuple = [structure.domain[i], structure.domain[j]];
-                        const isTrue = extensions.some(ext => 
-                            ext.length === tuple.length && 
-                            ext.every((val, idx) => val === tuple[idx])
-                        );
-                        const cellClass = isTrue ? 'true' : 'false';
-                        html += `<td class="${cellClass}">${isTrue ? 'T' : 'F'}</td>`;
-                    }
-                    html += '</tr>';
-                }
-                html += '</tbody>';
-                html += '</table>';
-                html += '</div>';
-            });
-            html += '</div>';
-        }
-        
-        // Display functions
-        if (structure.functions && Object.keys(structure.functions).length > 0) {
-            html += '<div class="structure-section">';
-            html += '<h5>Functions</h5>';
-            Object.entries(structure.functions).forEach(([funcName, mapping]) => {
-                html += `<div class="function-table">`;
-                html += `<h6>${funcName}</h6>`;
-                html += '<table class="function-matrix">';
-                html += '<thead><tr><th>Input</th><th>Output</th></tr></thead>';
-                html += '<tbody>';
-                
-                Object.entries(mapping).forEach(([input, output]) => {
-                    html += '<tr>';
-                    html += `<td>${input}</td>`;
-                    html += `<td>${output}</td>`;
-                    html += '</tr>';
-                });
-                
-                html += '</tbody>';
-                html += '</table>';
-                html += '</div>';
-            });
-            html += '</div>';
-        }
-        
-        html += '</div>';
-        container.innerHTML = html;
-    }
-    
+  
     hideAllResultPanels() {
-        const panels = ['truth-table', 'kripke', 'structure'];
-        panels.forEach(panelId => {
-            const panel = document.getElementById(`${panelId}-panel`);
-            if (panel) {
-                panel.style.display = 'none';
-            }
-        });
+      ['truth-table','kripke','finite-structure'].forEach(id => {
+        const panel = document.getElementById(`${id}-panel`);
+        if (panel) panel.style.display = 'none';
+      });
     }
-    
-    showResultPanel(panelId) {
-        const panel = document.getElementById(`${panelId}-panel`);
-        if (panel) {
-            panel.style.display = 'block';
-        }
+  
+    showResultPanel(id) {
+      const panel = document.getElementById(`${id}-panel`);
+      if (panel) panel.style.display = 'block';
     }
-    
-    showNoDataMessage() {
-        // Show a message when no relevant data is available
-        const resultsContainer = document.getElementById('results-container');
-        const noDataMessage = document.createElement('div');
-        noDataMessage.className = 'no-data-message';
-        noDataMessage.innerHTML = '<p>No visualization data available for this result.</p>';
-        
-        // Remove any existing no-data message
-        const existingMessage = resultsContainer.querySelector('.no-data-message');
-        if (existingMessage) {
-            existingMessage.remove();
+  
+    displayResult(result) {
+      const statusMap = {
+        'VALID':   {icon:'✅', text:'Valid',   class:'status-valid'},
+        'INVALID': {icon:'❌', text:'Invalid', class:'status-invalid'},
+        'UNKNOWN': {icon:'❓', text:'Unknown', class:'status-unknown'},
+        'ERROR':   {icon:'⚠️', text:'Error',   class:'status-error'}
+      };
+      const s = statusMap[result.status] || statusMap.ERROR;
+      this.showResultSummary(s.icon, s.text, s.class);
+  
+      this.hideAllResultPanels();
+  
+      let shown = false;
+      if (result.artifacts) {
+        if (result.artifacts.truth_table) {
+          this.displayTruthTable(result.artifacts.truth_table);
+          this.showResultPanel('truth-table');
+          shown = true;
         }
-        
-        resultsContainer.appendChild(noDataMessage);
+        if (result.artifacts.kripke) {
+          this.displayKripkeModel(result.artifacts.kripke);
+          this.showResultPanel('kripke');
+          shown = true;
+        }
+        if (result.artifacts.structure) {
+          this.displayFiniteStructure(result.artifacts.structure);
+          this.showResultPanel('finite-structure');
+          shown = true;
+        }
+      }
+      if (!shown) this.showNoDataMessage();
     }
-    
-    async loadExamples() {
-        try {
-            const response = await fetch('/api/examples');
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            const examples = await response.json();
-            
-            this.displayExamples(examples);
-        } catch (error) {
-            console.error('Failed to load examples:', error);
-            document.getElementById('examples-grid').innerHTML = 
-                '<p>Failed to load examples: ' + error.message + '</p>';
+  
+    displayTruthTable(truthTable) {
+      const container = document.getElementById('truth-table-container');
+      if (!truthTable || !truthTable.length) {
+        container.innerHTML = '<p>No truth table data.</p>'; return;
+      }
+      const variables = Object.keys(truthTable[0].values);
+      let html = '<div class="truth-table-wrapper"><table class="truth-table">';
+      html += '<thead><tr>' + variables.map(v=>`<th>${v}</th>`).join('') + '<th>Result</th></tr></thead><tbody>';
+      truthTable.forEach(row => {
+        const rowClass = row.is_counterexample ? 'counterexample' : '';
+        html += `<tr class="${rowClass}">`;
+        for (const v of variables) {
+          const cell = row.values[v] ? 'T' : 'F';
+          const cc = row.is_counterexample ? 'highlight' : '';
+          html += `<td class="${cc}">${cell}</td>`;
         }
+        html += `<td class="${row.is_counterexample ? 'invalid-result' : 'valid-result'}">${row.is_counterexample?'❌':'✅'}</td>`;
+        html += `</tr>`;
+      });
+      html += '</tbody></table></div>';
+      const cexCount = truthTable.filter(r => r.is_counterexample).length;
+      html += `<div class="truth-table-summary"><p><strong>${cexCount ? `Found ${cexCount} counterexample(s)` : 'No counterexamples found'}</strong></p></div>`;
+      container.innerHTML = html;
     }
-    
-    displayExamples(examples) {
-        const container = document.getElementById('examples-grid');
-        let html = '';
-        
-        // Propositional examples
-        if (examples.propositional) {
-            examples.propositional.forEach(example => {
-                html += this.createExampleCard('PL', example);
-            });
-        }
-        
-        // Modal examples
-        if (examples.modal) {
-            examples.modal.forEach(example => {
-                html += this.createExampleCard('MODAL', example);
-            });
-        }
-        
-        // FOL examples
-        if (examples.fol) {
-            examples.fol.forEach(example => {
-                html += this.createExampleCard('FOL', example);
-            });
-        }
-        
-        container.innerHTML = html;
-        
-        // Add click handlers
-        container.querySelectorAll('.example-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const logic = card.dataset.logic;
-                const example = JSON.parse(card.dataset.example);
-                this.loadExample(logic, example);
-            });
-        });
-    }
-    
-    createExampleCard(logic, example) {
-        return `
-            <div class="example-card" data-logic="${logic}" data-example='${JSON.stringify(example)}'>
-                <h3>${example.name}</h3>
-                <p>${example.description}</p>
-                <div class="example-formula">
-                    <div class="example-premises">Premises: ${example.premises.join(', ')}</div>
-                    <div class="example-conclusion">Conclusion: ${example.conclusion}</div>
-                </div>
-            </div>
-        `;
-    }
-    
-    loadExample(logic, example) {
-        // Switch to workspace
-        this.switchTab('workspace');
-        
-        // Set logic type
-        document.getElementById('logic-type').value = logic;
-        this.updateLogicSettings();
-        
-        // Set modal frame for modal examples
-        if (logic === 'MODAL' && example.name && example.name.includes('Barcan')) {
-            document.getElementById('modal-frame').value = 'T';
-        }
-        
-        // Set premises and conclusion
-        if (Array.isArray(example.premises)) {
-            document.getElementById('premises').value = example.premises.join('\n');
+  
+    // ===== Kripke visualization (SVG) =====
+    displayKripkeModel(kripke) {
+      const el = document.getElementById('kripke-container');
+      if (!kripke) { el.innerHTML = '<p>No Kripke data.</p>'; return; }
+  
+      const W = 860, H = 520, R = Math.min(W, H)/2 - 80;
+      const worlds = kripke.worlds || [];
+      const edges = kripke.edges || [];
+  
+      // layout positions in a circle
+      const positions = {};
+      const n = worlds.length || 1;
+      for (let i=0;i<n;i++) {
+        const theta = (2*Math.PI * i) / n - Math.PI/2;
+        positions[worlds[i].id] = {
+          x: W/2 + (n>1 ? R*Math.cos(theta) : 0),
+          y: H/2 + (n>1 ? R*Math.sin(theta) : 0)
+        };
+      }
+  
+      // SVG header with arrowhead markers
+      let svg = `
+        <svg class="kripke-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" aria-label="Kripke Model">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
+          </defs>
+          <rect x="0" y="0" width="${W}" height="${H}" class="kripke-bg"></rect>
+      `;
+  
+      // Draw edges (under nodes)
+      edges.forEach(e => {
+        const u = positions[e.from], v = positions[e.to];
+        if (!u || !v) return;
+  
+        const isLoop = e.from === e.to;
+        const classes = ['edge'];
+        if (e.properties && e.properties.includes('symmetric') && !isLoop) classes.push('edge-symmetric');
+        if (e.properties && e.properties.includes('transitive') && !isLoop) classes.push('edge-transitive');
+        if (e.properties && e.properties.includes('reflexive') && isLoop) classes.push('edge-reflexive');
+  
+        if (isLoop) {
+          // self loop as an arc above the node
+          const r = 26;
+          const x = u.x, y = u.y;
+          const path = `M ${x+r} ${y-4} a ${r} ${r} 0 1 1 -${2*r} 0`;
+          svg += `<path d="${path}" class="${classes.join(' ')}" marker-end="url(#arrow)"></path>`;
         } else {
-            document.getElementById('premises').value = example.premises;
+          const dx = v.x - u.x, dy = v.y - u.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const off = 28; // node radius margin
+          const sx = u.x + (dx/len)*off, sy = u.y + (dy/len)*off;
+          const ex = v.x - (dx/len)*off, ey = v.y - (dy/len)*off;
+          svg += `<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" class="${classes.join(' ')}" marker-end="url(#arrow)"></line>`;
         }
-        document.getElementById('conclusion').value = example.conclusion;
+      });
+  
+      // Draw nodes
+      worlds.forEach(w => {
+        const p = positions[w.id];
+        const isRoot = !!w.is_root;
+        svg += `<g class="node${isRoot?' node-root':''}" transform="translate(${p.x},${p.y})">`;
+        svg += `<circle r="28"></circle>`;
+        svg += `<text class="node-label" text-anchor="middle" dy="5">${w.id}</text>`;
+        svg += `</g>`;
+      });
+  
+      svg += `</svg>`;
+  
+      // Build HTML container with legend + SVG
+      let html = `
+        <div class="kripke-viz">
+          <div class="kripke-meta">
+            <div><strong>Frame:</strong> ${kripke.frame||'K'}</div>
+            <div><strong>Worlds:</strong> ${worlds.length}</div>
+          </div>
+          <div class="kripke-legend">
+            <span class="legend-item"><span class="legend-edge"></span> accessibility</span>
+            <span class="legend-item"><span class="legend-edge symmetric"></span> symmetric</span>
+            <span class="legend-item"><span class="legend-edge transitive"></span> transitive</span>
+            <span class="legend-item"><span class="legend-node root"></span> root world</span>
+          </div>
+          ${svg}
+      `;
+  
+      // Node annotations: valuation atoms + per-formula truth if provided
+      const atomSet = new Set();
+      worlds.forEach(w => {
+        Object.keys(w.valuation||{}).forEach(a => atomSet.add(a));
+      });
+      const atoms = Array.from(atomSet);
+  
+      if (atoms.length || (kripke.formulas && kripke.truth)) {
+        html += `<div class="kripke-annotations">`;
+  
+        if (atoms.length) {
+          html += `<div class="anno-section"><h5>Atomic Propositions</h5>`;
+          worlds.forEach(w=>{
+            html += `<div class="anno-row"><strong>${w.id}</strong>: `;
+            atoms.forEach(a=>{
+              const v = !!(w.valuation && w.valuation[a]);
+              html += `<span class="prop-chip ${v?'true':'false'}">${a}</span>`;
+            });
+            html += `</div>`;
+          });
+          html += `</div>`;
+        }
+  
+        if (kripke.formulas && kripke.truth) {
+          const labels = kripke.formulas;   // {P1: "□P", ..., C: "Q"}
+          const truth = kripke.truth;       // {w0:{P1:true,...,C:false}, ...}
+          const keys = Object.keys(labels);
+          html += `<div class="anno-section"><h5>Formula Truth by World</h5>`;
+          html += `<div class="formula-legend">` +
+                  keys.map(k => `<span class="formula-chip">${k}: ${labels[k]}</span>`).join(' ') +
+                  `</div>`;
+          worlds.forEach(w=>{
+            html += `<div class="anno-row"><strong>${w.id}</strong>: `;
+            keys.forEach(k=>{
+              const val = truth[w.id] ? truth[w.id][k] : false;
+              const cls = k === 'C' ? 'conclusion' : 'premise';
+              html += `<span class="formula-state ${cls} ${val?'true':'false'}">${k}</span>`;
+            });
+            html += `</div>`;
+          });
+          html += `</div>`;
+        }
+  
+        html += `</div>`;
+      }
+  
+      // Accessibility list (text)
+      if (edges && edges.length) {
+        html += '<div class="accessibility-relations"><h5>Accessibility Relations</h5>';
+        edges.forEach(e=>{
+          html += `<div class="accessibility-edge">${e.from} → ${e.to}${e.properties?` (${e.properties.join(', ')})`:''}</div>`;
+        });
+        html += '</div>';
+      }
+  
+      html += `</div>`; // close kripke-viz
+      el.innerHTML = html;
     }
-}
-
-// Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new TruthToolApp();
-});
+  
+    displayFiniteStructure(struct) {
+      const el = document.getElementById('finite-structure-container');
+      if (!struct) { el.innerHTML = '<p>No structure.</p>'; return; }
+      let html = '<div class="structure">';
+      // Domain
+      html += '<div class="structure-section"><h4>Domain</h4>';
+      html += `<div class="structure-domain">${(struct.domain||[]).join(', ')}</div></div>`;
+      // Predicates
+      if (struct.predicates && Object.keys(struct.predicates).length) {
+        html += '<div class="structure-section"><h4>Predicates</h4>';
+        Object.entries(struct.predicates).forEach(([name,info])=>{
+          html += `<div class="predicate-card"><div class="predicate-name">${name}/${info.arity}</div>`;
+          if (info.tuples && info.tuples.length) {
+            html += '<table class="predicate-table"><thead><tr>';
+            for (let i=0;i<info.arity;i++) html += `<th>arg${i+1}</th>`;
+            html += '</tr></thead><tbody>';
+            info.tuples.forEach(t=>{
+              html += '<tr>' + t.map(x=>`<td>${x}</td>`).join('') + '</tr>';
+            });
+            html += '</tbody></table>';
+          } else {
+            html += '<div class="predicate-empty">No true tuples</div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+      el.innerHTML = html;
+    }
+  
+    showNoDataMessage() {
+      const results = document.getElementById('results-container');
+      const msg = document.createElement('div');
+      msg.className = 'no-data-message';
+      msg.innerHTML = '<p>No visualization data available for this result.</p>';
+      const existing = results.querySelector('.no-data-message');
+      if (existing) existing.remove();
+      results.appendChild(msg);
+    }
+  
+    // ===== Examples =====
+  
+    async loadExamples() {
+      try {
+        const r = await fetch('/api/examples');
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        const ex = await r.json();
+        this.displayExamples(ex);
+      } catch (e) {
+        console.error('Failed to load examples:', e);
+        document.getElementById('examples-grid').innerHTML =
+          `<p>Failed to load examples: ${e.message}</p>`;
+      }
+    }
+  
+    displayExamples(ex) {
+      const container = document.getElementById('examples-grid');
+      let html = '';
+      if (ex.propositional) ex.propositional.forEach(x => html += this._exampleCard('PL', x));
+      if (ex.modal)         ex.modal.forEach(x => html += this._exampleCard('MODAL', x));
+      if (ex.fol)           ex.fol.forEach(x => html += this._exampleCard('FOL', x));
+      container.innerHTML = html;
+  
+      // Delegated click handler: clicking any example fills the workspace
+      container.addEventListener('click', (evt) => {
+        const card = evt.target.closest('.example-card');
+        if (!card) return;
+  
+        const logic = card.dataset.logic;                 // "PL" | "MODAL" | "FOL"
+        const example = JSON.parse(card.dataset.example); // {name, premises, conclusion, description, settings?}
+  
+        // Switch to workspace and set logic
+        this.switchTab('workspace');
+        const logicSel = document.getElementById('logic-type');
+        logicSel.value = logic;
+        this.updateLogicSettings(); // show relevant settings panel
+  
+        // Fill premises & conclusion
+        const premisesField = document.getElementById('premises');
+        const conclusionField = document.getElementById('conclusion');
+        premisesField.value = Array.isArray(example.premises) ? example.premises.join('\n') : (example.premises || '');
+        conclusionField.value = example.conclusion || '';
+  
+        // Apply example-specific settings if present
+        const settings = example.settings || {};
+  
+        if (logic === 'MODAL') {
+          const frameSel = document.getElementById('modal-frame');
+          // Prefer explicit setting; otherwise guess from example name
+          if (settings.modalFrame) {
+            frameSel.value = settings.modalFrame;
+          } else if (typeof example.name === 'string') {
+            const name = example.name.toUpperCase();
+            if (name.includes('S5')) frameSel.value = 'S5';
+            else if (name.includes('S4')) frameSel.value = 'S4';
+            else if (/\bT\b/.test(name)) frameSel.value = 'T';
+            else frameSel.value = 'K';
+          } else {
+            frameSel.value = 'K';
+          }
+        }
+  
+        if (logic === 'FOL') {
+          const dom = document.getElementById('fol-domain');
+          const depth = document.getElementById('fol-depth');
+          if (Number.isInteger(settings.domainSize)) dom.value = settings.domainSize;
+          if (Number.isInteger(settings.termDepth)) depth.value = settings.termDepth;
+        }
+  
+        // Optional: focus conclusion for quick edits
+        conclusionField.focus();
+      });
+    }
+  
+    _exampleCard(logic, ex) {
+      // Store full example (incl. settings) into data-example
+      const safe = JSON.stringify(ex).replace(/"/g, '&quot;');
+      return `
+        <div class="example-card" data-logic="${logic}" data-example="${safe}">
+          <h3>${ex.name}</h3>
+          <p>${ex.description || ''}</p>
+          <div class="example-formula">
+            <div class="example-premises"><strong>Premises:</strong> ${Array.isArray(ex.premises) ? ex.premises.join(', ') : ex.premises}</div>
+            <div class="example-conclusion"><strong>Conclusion:</strong> ${ex.conclusion}</div>
+          </div>
+        </div>`;
+    }
+  }
+  
+  document.addEventListener('DOMContentLoaded', () => new TruthToolApp());
+  
