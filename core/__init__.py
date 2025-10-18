@@ -1,1 +1,1 @@
-# LogicFoundry Core Module
+# TruthTool core package
